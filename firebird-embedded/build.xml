@@ -1,0 +1,97 @@
+<?xml version="1.0"?>
+<project name="firebird-embedded" default="package-all" basedir=".">
+	
+	<!--
+		Este arquivo é um descritor ANT para gerar os arquivos da pasta 
+		  src/main/resources/firebird-embedded
+		  
+		Este script faz:
+		- baixa os arquivos de distribuição do firebird (linux e windows, 32bits e 64 bits)
+		- gera um novo zip minificado para cada uma as distribuições
+		- e coloca esses zips dentro de "src/main/resources/firebird-embedded"
+		
+		Para atualizar uma versão do firebird (teoricamente) basta alterar as "property" abaixo:
+		- firebird.version
+		- firebird.release
+		
+		Depois é só clicar com o botão direito do mouse aqui e selecionar:
+		- Run As >> Ant Build...
+		
+		Aguarde o processo terminar, no fim deve aparecer na aba Console:
+		- BUILD SUCCESSFUL
+	
+		Pronto, agora:
+		- Atualize a versão dentro do "pom.xml"
+		- Grave as alterações no GIT
+		- Crie uma nova TAG para essa versão 
+		- Faça o deploy (mvn deploy)
+	-->
+	
+	<property name="firebird.version" value="3.0.7.33374" />
+	<property name="firebird.release" value="R3_0_7" />
+	
+	<target name="package-all">
+		
+		<mkdir dir="tmp" />
+		<mkdir dir="tmp/win" />
+		<mkdir dir="tmp/linux" />
+		
+		<get src="https://github.com/FirebirdSQL/firebird/releases/download/${firebird.release}/Firebird-${firebird.version}-1_Win32.zip" dest="tmp/win/32.zip" />
+		<get src="https://github.com/FirebirdSQL/firebird/releases/download/${firebird.release}/Firebird-${firebird.version}-1_x64.zip" dest="tmp/win/64.zip" />
+		<get src="https://github.com/FirebirdSQL/firebird/releases/download/${firebird.release}/Firebird-${firebird.version}-0.i686.tar.gz" dest="tmp/linux/32.tar.gz" />
+		<get src="https://github.com/FirebirdSQL/firebird/releases/download/${firebird.release}/Firebird-${firebird.version}-0.amd64.tar.gz" dest="tmp/linux/64.tar.gz" />
+
+		<unzip src="tmp/win/32.zip" dest="tmp/win/32" />
+		<unzip src="tmp/win/64.zip" dest="tmp/win/64" />
+		
+		<untar src="tmp/linux/32.tar.gz" dest="tmp/linux/32" compression="gzip" /> 
+		<untar src="tmp/linux/64.tar.gz" dest="tmp/linux/64" compression="gzip" />
+		
+		<untar src="tmp/linux/32/Firebird-${firebird.version}-0.i686/buildroot.tar.gz" dest="tmp/linux/32" compression="gzip" /> 
+		<untar src="tmp/linux/64/Firebird-${firebird.version}-0.amd64/buildroot.tar.gz" dest="tmp/linux/64" compression="gzip" />
+		
+		<delete includeEmptyDirs="true">
+			<fileset dir="tmp/win" includes="**/doc/"/>
+			<fileset dir="tmp/win" includes="**/examples/"/>
+			<fileset dir="tmp/win" includes="**/help/"/>
+			<fileset dir="tmp/win" includes="**/include/"/>
+			<fileset dir="tmp/win" includes="**/misc/"/>
+			<fileset dir="tmp/win" includes="**/system32/"/>
+			<fileset dir="tmp/win" includes="**/**/*.exe"/>
+			<fileset dir="tmp/win" includes="**/**/*.bat"/>
+			
+			<fileset dir="tmp/linux" includes="**/Firebird-${firebird.version}*/"/>
+			<fileset dir="tmp/linux" includes="**/doc/"/>
+			<fileset dir="tmp/linux" includes="**/examples/"/>
+			<fileset dir="tmp/linux" includes="**/help/"/>
+			<fileset dir="tmp/linux" includes="**/include/"/>
+			<fileset dir="tmp/linux" includes="**/misc/"/>
+			<fileset dir="tmp/linux" includes="**/bin/"/>
+			
+			<fileset dir="tmp" includes="**/**/**/security3.fdb"/>
+			
+			<fileset dir="src/main/resources/firebird-embedded/" includes="*.zip"/>
+		</delete>
+		
+		<delete>
+			<fileset dir="tmp/linux" includes="**/*">
+				<size value="0" />
+			</fileset>
+		</delete>
+		
+		<echo file="tmp/win/32/firebird.conf" append="true">Providers = Engine12${line.separator}ServerMode = Classic</echo>
+		<echo file="tmp/win/64/firebird.conf" append="true">Providers = Engine12${line.separator}ServerMode = Classic</echo>
+		<echo file="tmp/linux/32/firebird.conf" append="true">Providers = Engine12${line.separator}ServerMode = Classic</echo>
+		<echo file="tmp/linux/64/firebird.conf" append="true">Providers = Engine12${line.separator}ServerMode = Classic</echo>
+		
+		
+		<zip destfile="src/main/resources/firebird-embedded/win32.zip" basedir="tmp/win/32" update="true" comment="${firebird.version}" />
+		<zip destfile="src/main/resources/firebird-embedded/win64.zip" basedir="tmp/win/64" update="true" comment="${firebird.version}" />
+		<zip destfile="src/main/resources/firebird-embedded/linux32.zip" basedir="tmp/linux/32/opt/firebird" update="true" comment="${firebird.version}" />
+		<zip destfile="src/main/resources/firebird-embedded/linux64.zip" basedir="tmp/linux/64/opt/firebird" update="true" comment="${firebird.version}" />
+		
+		<echo file="src/main/resources/firebird-embedded/version.properties">version=${firebird.version}</echo>
+		
+		<delete dir="tmp" />
+	</target>
+</project>
