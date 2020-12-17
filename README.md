@@ -2,7 +2,7 @@
 
 This a Firebird SQL library to provide the instalation files for Firebird SQL embedded.
 
-With this library, o can just set up a java application using a Firebird SQL Embedded database.
+With this library, you can just set up a java application using a Firebird SQL Embedded database.
 
 ## How to use
 
