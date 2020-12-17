@@ -1,5 +1,6 @@
 package br.com.jjw.firebird.embedded.service.impl;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigInteger;
@@ -35,6 +36,8 @@ public class FirebirdEmbeddedServiceImpl implements FirebirdEmbeddedService {
 
 	@Override
 	public boolean install(Path destination) throws IOException {
+		logger.info("Iniciando a instalação do Firebird Embedded");
+
 		boolean filesExtracted = false;
 
 		String md5 = getMd5();
@@ -56,7 +59,11 @@ public class FirebirdEmbeddedServiceImpl implements FirebirdEmbeddedService {
 			destination = destination.resolve("lib");
 		}
 		path = path + destination.toAbsolutePath().toString();
+
+		logger.info("Atualizando o jna.library.path para: " + path);
 		System.setProperty("jna.library.path", path);
+
+		logger.info("Instalação concluída");
 
 		return filesExtracted;
 	}
@@ -80,16 +87,26 @@ public class FirebirdEmbeddedServiceImpl implements FirebirdEmbeddedService {
 	}
 
 	private boolean canUnzip(String md5, Path destination) throws IOException {
+		logger.info("Verificando se é necessário fazer a extração dos arquivos do Firebird");
+
 		Path cached = destination.resolve(".md5");
 		if (Files.notExists(cached)) {
+			logger.info("A versão da instalação do Firebird local não existe");
 			return true;
 		}
 
 		List<String> lines = Files.readAllLines(cached, Charset.forName("ISO8859-1"));
 		if (lines.isEmpty()) {
+			logger.info("A versão da instalação do Firebird local não pode ser carregada");
 			return true;
 		}
-		return !lines.get(0).equals(md5);
+		String localMd5 = lines.get(0);
+		if (!localMd5.equals(md5)) {
+			logger.info("A versão da instalação do Firebird local (" + localMd5 + ") é diferente da embarcada (" + md5 + ")");
+			return true;
+		}
+		logger.info("A versão da instalação do Firebird local é a mesma que a embarcada: " + md5);
+		return false;
 	}
 
 	private String getMd5() throws IOException {
@@ -110,9 +127,13 @@ public class FirebirdEmbeddedServiceImpl implements FirebirdEmbeddedService {
 	}
 
 	private void unzip(Path destination) throws IOException {
-		if (!Files.exists(destination) || !Files.isDirectory(destination)) {
-			Files.createDirectories(destination);
+		logger.info("Descompactando os arquivos do Firebird");
+
+		if (Files.exists(destination) && Files.isDirectory(destination)) {
+			logger.fine("Excluindo o diretório: " + destination);
+			Files.walk(destination).map(Path::toFile).sorted((o1, o2) -> -o1.compareTo(o2)).forEach(File::delete);
 		}
+		Files.createDirectories(destination);
 
 		boolean linux = !isWindows();
 		try (ZipInputStream zip = new ZipInputStream(getResourceZip())) {
@@ -124,9 +145,11 @@ public class FirebirdEmbeddedServiceImpl implements FirebirdEmbeddedService {
 						Files.createDirectories(file);
 					}
 				} else {
+					logger.fine("Descompactando: " + file);
 					Files.copy(zip, file, StandardCopyOption.REPLACE_EXISTING);
 					// no linux temos que criar um link simbolico pra o lib original
 					if (linux && file.getFileName().toString().startsWith("libfbclient.so.")) {
+						logger.fine("Criando links simbólicos das bibliotecas do firebird");
 						Files.createSymbolicLink(file.getParent().resolve("libfbclient.so"), file.getFileName());
 						Files.createSymbolicLink(file.getParent().resolve("libfbclient.so.2"), file.getFileName());
 						Files.createSymbolicLink(file.getParent().resolve("libfbembed.so"), file.getFileName());
